@@ -32,11 +32,11 @@ func TestAgentsCommunicateOverWireGuardPrivateIPs(t *testing.T) {
 
 	run(t, ctx, repo, append(args, "up", "--build", "-d")...)
 	waitForHealth(t, ctx)
-	waitForPeer(t, ctx, "agent-a", "agent-b")
-	waitForPeer(t, ctx, "agent-b", "agent-a")
+	agentBPrivateIP := waitForPeerPrivateIP(t, ctx, "agent-a", "agent-b")
+	agentAPrivateIP := waitForPeerPrivateIP(t, ctx, "agent-b", "agent-a")
 
-	run(t, ctx, repo, append(args, "exec", "-T", "agent-a", "ping", "-c", "3", "-W", "2", "10.44.0.2")...)
-	run(t, ctx, repo, append(args, "exec", "-T", "agent-b", "ping", "-c", "3", "-W", "2", "10.44.0.1")...)
+	run(t, ctx, repo, append(args, "exec", "-T", "agent-a", "ping", "-c", "3", "-W", "2", agentBPrivateIP)...)
+	run(t, ctx, repo, append(args, "exec", "-T", "agent-b", "ping", "-c", "3", "-W", "2", agentAPrivateIP)...)
 }
 
 func buildLinuxBinaries(t *testing.T, ctx context.Context, repo string) {
@@ -71,8 +71,9 @@ func waitForHealth(t *testing.T, ctx context.Context) {
 	})
 }
 
-func waitForPeer(t *testing.T, ctx context.Context, agentID, wantPeer string) {
+func waitForPeerPrivateIP(t *testing.T, ctx context.Context, agentID, wantPeer string) string {
 	t.Helper()
+	var privateIP string
 	waitFor(t, ctx, agentID+" sees "+wantPeer, func() bool {
 		resp, err := http.Get("http://127.0.0.1:18080/v1/agents/" + agentID + "/peers")
 		if err != nil {
@@ -88,11 +89,13 @@ func waitForPeer(t *testing.T, ctx context.Context, agentID, wantPeer string) {
 		}
 		for _, peer := range peers.Peers {
 			if peer.AgentID == wantPeer {
-				return true
+				privateIP = peer.PrivateIP
+				return privateIP != ""
 			}
 		}
 		return false
 	})
+	return privateIP
 }
 
 func waitFor(t *testing.T, ctx context.Context, name string, fn func() bool) {

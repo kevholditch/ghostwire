@@ -1,0 +1,79 @@
+services:
+  control:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    command: ["/usr/local/bin/ghostwire-control"]
+    environment:
+      GHOSTWIRE_CONTROL_LISTEN: ":8080"
+      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_NETWORK_CIDR: "10.44.0.0/24"
+      GHOSTWIRE_HEARTBEAT_INTERVAL: "1s"
+      GHOSTWIRE_POLL_INTERVAL: "1s"
+      GHOSTWIRE_AGENT_TTL: "20s"
+    ports:
+      - "18080:8080"
+    networks:
+      ghostwire:
+        ipv4_address: 172.28.0.10
+
+  agent-a:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    command: ["/usr/local/bin/ghostwire-agent"]
+    depends_on:
+      - control
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    privileged: true
+    environment:
+      GHOSTWIRE_AGENT_ID: "agent-a"
+      GHOSTWIRE_HOSTNAME: "agent-a"
+      GHOSTWIRE_CONTROL_URL: "http://control:8080"
+      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_STATE_DIR: "/var/lib/ghostwire"
+      GHOSTWIRE_INTERFACE: "gw0"
+      GHOSTWIRE_LISTEN_PORT: "51820"
+      GHOSTWIRE_ENDPOINT: "172.28.0.11:51820"
+      GHOSTWIRE_HEARTBEAT_INTERVAL: "1s"
+      GHOSTWIRE_POLL_INTERVAL: "1s"
+    networks:
+      ghostwire:
+        ipv4_address: 172.28.0.11
+
+  agent-b:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    command: ["/usr/local/bin/ghostwire-agent"]
+    depends_on:
+      - control
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    privileged: true
+    environment:
+      GHOSTWIRE_AGENT_ID: "agent-b"
+      GHOSTWIRE_HOSTNAME: "agent-b"
+      GHOSTWIRE_CONTROL_URL: "http://control:8080"
+      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_STATE_DIR: "/var/lib/ghostwire"
+      GHOSTWIRE_INTERFACE: "gw0"
+      GHOSTWIRE_LISTEN_PORT: "51820"
+      GHOSTWIRE_ENDPOINT: "172.28.0.12:51820"
+      GHOSTWIRE_HEARTBEAT_INTERVAL: "1s"
+      GHOSTWIRE_POLL_INTERVAL: "1s"
+    networks:
+      ghostwire:
+        ipv4_address: 172.28.0.12
+
+networks:
+  ghostwire:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

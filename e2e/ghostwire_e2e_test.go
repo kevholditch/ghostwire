@@ -23,6 +23,7 @@ func TestAgentsCommunicateOverWireGuardPrivateIPs(t *testing.T) {
 	defer cancel()
 
 	repo := repoRoot(t)
+	t.Log("building linux binaries")
 	buildLinuxBinaries(t, ctx, repo)
 
 	compose := composeCommand(t)
@@ -30,12 +31,20 @@ func TestAgentsCommunicateOverWireGuardPrivateIPs(t *testing.T) {
 	args := append(compose, "-f", filepath.Join(repo, "e2e", "docker-compose.yml"), "-p", project)
 	defer runBestEffort(t, ctx, append(args, "down", "-v", "--remove-orphans")...)
 
+	t.Log("starting docker compose environment")
 	run(t, ctx, repo, append(args, "up", "--build", "-d")...)
+	t.Log("waiting for control plane health")
 	waitForHealth(t, ctx)
+	t.Log("waiting for agent-a to see agent-b")
 	agentBPrivateIP := waitForPeerPrivateIP(t, ctx, "agent-a", "agent-b")
+	t.Logf("agent-a sees agent-b at %s", agentBPrivateIP)
+	t.Log("waiting for agent-b to see agent-a")
 	agentAPrivateIP := waitForPeerPrivateIP(t, ctx, "agent-b", "agent-a")
+	t.Logf("agent-b sees agent-a at %s", agentAPrivateIP)
 
+	t.Logf("pinging agent-b private IP %s from agent-a", agentBPrivateIP)
 	run(t, ctx, repo, append(args, "exec", "-T", "agent-a", "ping", "-c", "3", "-W", "2", agentBPrivateIP)...)
+	t.Logf("pinging agent-a private IP %s from agent-b", agentAPrivateIP)
 	run(t, ctx, repo, append(args, "exec", "-T", "agent-b", "ping", "-c", "3", "-W", "2", agentAPrivateIP)...)
 }
 
@@ -143,9 +152,10 @@ func run(t *testing.T, ctx context.Context, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("run %s: %v\n%s", strings.Join(args, " "), err, out)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("run %s: %v", strings.Join(args, " "), err)
 	}
 }
 

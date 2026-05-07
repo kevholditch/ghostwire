@@ -3,70 +3,35 @@ package controlplane
 import "testing"
 
 func TestIPAMAllocatesDeterministicUsableIPv4Addresses(t *testing.T) {
-	ipam, err := NewIPAM("10.44.0.0/29")
-	if err != nil {
-		t.Fatalf("new ipam: %v", err)
-	}
+	given, when, then := NewIPAMStage(t)
 
-	first, err := ipam.Allocate("agent-a")
-	if err != nil {
-		t.Fatalf("allocate first: %v", err)
-	}
-	second, err := ipam.Allocate("agent-b")
-	if err != nil {
-		t.Fatalf("allocate second: %v", err)
-	}
-
-	if first != "10.44.0.1" {
-		t.Fatalf("first address = %q, want 10.44.0.1", first)
-	}
-	if second != "10.44.0.2" {
-		t.Fatalf("second address = %q, want 10.44.0.2", second)
-	}
-	if first == second {
-		t.Fatalf("expected unique addresses, got %q twice", first)
-	}
+	given.there_is_an_ipam_for_a_29_network()
+	when.agent_a_and_agent_b_are_allocated_addresses()
+	then.agent_a_is_given_the_first_usable_address().and().
+		agent_b_is_given_the_second_usable_address().and().
+		the_agents_have_unique_addresses()
 }
 
 func TestIPAMReturnsStableLeaseForExistingAgent(t *testing.T) {
-	ipam, err := NewIPAM("10.44.0.0/29")
-	if err != nil {
-		t.Fatalf("new ipam: %v", err)
-	}
+	given, when, then := NewIPAMStage(t)
 
-	first, err := ipam.Allocate("agent-a")
-	if err != nil {
-		t.Fatalf("allocate first: %v", err)
-	}
-	second, err := ipam.Allocate("agent-a")
-	if err != nil {
-		t.Fatalf("allocate second: %v", err)
-	}
-
-	if first != second {
-		t.Fatalf("stable lease = %q then %q", first, second)
-	}
+	given.there_is_an_ipam_for_a_29_network()
+	when.agent_a_is_allocated_an_address_twice()
+	then.agent_a_is_given_the_same_address_both_times()
 }
 
 func TestIPAMReportsExhaustion(t *testing.T) {
-	ipam, err := NewIPAM("10.44.0.0/30")
-	if err != nil {
-		t.Fatalf("new ipam: %v", err)
-	}
+	given, when, then := NewIPAMStage(t)
 
-	if _, err := ipam.Allocate("agent-a"); err != nil {
-		t.Fatalf("allocate agent-a: %v", err)
-	}
-	if _, err := ipam.Allocate("agent-b"); err != nil {
-		t.Fatalf("allocate agent-b: %v", err)
-	}
-	if _, err := ipam.Allocate("agent-c"); err == nil {
-		t.Fatal("expected exhaustion error")
-	}
+	given.there_is_an_ipam_for_a_30_network()
+	when.three_agents_are_allocated_addresses()
+	then.the_third_agent_is_rejected_because_the_cidr_is_exhausted()
 }
 
 func TestIPAMRejectsInvalidCIDR(t *testing.T) {
-	if _, err := NewIPAM("not-a-cidr"); err == nil {
-		t.Fatal("expected invalid cidr error")
-	}
+	given, when, then := NewIPAMStage(t)
+
+	given.there_is_no_existing_ipam()
+	when.an_ipam_is_created_with_an_invalid_cidr()
+	then.the_cidr_is_rejected()
 }

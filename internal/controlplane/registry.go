@@ -132,6 +132,24 @@ func (r *Registry) Peers(agentID string, now time.Time) (protocol.PeersResponse,
 	return protocol.PeersResponse{Peers: peers}, nil
 }
 
+func (r *Registry) Nodes(_ time.Time) protocol.NodesResponse {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	nodes := make([]protocol.Node, 0, len(r.agents))
+	for _, agent := range r.agents {
+		nodes = append(nodes, protocol.Node{
+			NodeID:             agent.AgentID,
+			Hostname:           agent.Hostname,
+			WireGuardPublicKey: agent.WireGuardPublicKey,
+			GhostwireIP:        agent.PrivateIP,
+			LastSeen:           agent.LastSeen,
+		})
+	}
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].NodeID < nodes[j].NodeID })
+	return protocol.NodesResponse{Nodes: nodes}
+}
+
 func (r *Registry) Agent(agentID string) (AgentRecord, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

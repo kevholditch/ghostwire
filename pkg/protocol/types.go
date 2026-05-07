@@ -39,6 +39,18 @@ type PeersResponse struct {
 	Peers []Peer `json:"peers"`
 }
 
+type Node struct {
+	NodeID             string    `json:"node_id"`
+	Hostname           string    `json:"hostname"`
+	WireGuardPublicKey string    `json:"wireguard_public_key"`
+	GhostwireIP        string    `json:"ghostwire_ip"`
+	LastSeen           time.Time `json:"last_seen"`
+}
+
+type NodesResponse struct {
+	Nodes []Node `json:"nodes"`
+}
+
 type ErrorResponse struct {
 	Error string `json:"error"`
 }

@@ -30,7 +30,6 @@ services:
       - /dev/net/tun:/dev/net/tun
     privileged: true
     environment:
-      GHOSTWIRE_AGENT_ID: "agent-a"
       GHOSTWIRE_HOSTNAME: "agent-a"
       GHOSTWIRE_CONTROL_URL: "http://control:8080"
       GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
@@ -57,7 +56,6 @@ services:
       - /dev/net/tun:/dev/net/tun
     privileged: true
     environment:
-      GHOSTWIRE_AGENT_ID: "agent-b"
       GHOSTWIRE_HOSTNAME: "agent-b"
       GHOSTWIRE_CONTROL_URL: "http://control:8080"
       GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"

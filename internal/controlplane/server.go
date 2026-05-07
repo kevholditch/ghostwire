@@ -31,6 +31,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", s.handleHealthz)
+	s.mux.HandleFunc("/v1/nodes", s.handleNodes)
 	s.mux.HandleFunc("/v1/agents/enroll", s.handleEnroll)
 	s.mux.HandleFunc("/v1/agents/heartbeat", s.handleHeartbeat)
 	s.mux.HandleFunc("/v1/agents/", s.handleAgent)
@@ -78,6 +79,14 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.registry.Nodes(s.now()))
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {

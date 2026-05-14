@@ -6,7 +6,7 @@ services:
     command: ["/usr/local/bin/ghostwire-control"]
     environment:
       GHOSTWIRE_CONTROL_LISTEN: ":8080"
-      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_API_TOKEN: "test-token"
       GHOSTWIRE_NETWORK_CIDR: "10.44.0.0/24"
       GHOSTWIRE_HEARTBEAT_INTERVAL: "1s"
       GHOSTWIRE_POLL_INTERVAL: "1s"
@@ -32,7 +32,7 @@ services:
     environment:
       GHOSTWIRE_HOSTNAME: "agent-a"
       GHOSTWIRE_CONTROL_URL: "http://control:8080"
-      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_API_TOKEN: "test-token"
       GHOSTWIRE_STATE_DIR: "/var/lib/ghostwire"
       GHOSTWIRE_INTERFACE: "gw0"
       GHOSTWIRE_LISTEN_PORT: "51820"
@@ -58,7 +58,7 @@ services:
     environment:
       GHOSTWIRE_HOSTNAME: "agent-b"
       GHOSTWIRE_CONTROL_URL: "http://control:8080"
-      GHOSTWIRE_ENROLLMENT_TOKEN: "test-token"
+      GHOSTWIRE_API_TOKEN: "test-token"
       GHOSTWIRE_STATE_DIR: "/var/lib/ghostwire"
       GHOSTWIRE_INTERFACE: "gw0"
       GHOSTWIRE_LISTEN_PORT: "51820"

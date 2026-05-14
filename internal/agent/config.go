@@ -10,7 +10,7 @@ import (
 type Config struct {
 	AgentID                    string
 	ControlURL                 string
-	EnrollmentToken            string
+	APIToken                   string
 	StateDir                   string
 	Hostname                   string
 	Endpoint                   string
@@ -33,7 +33,7 @@ func ConfigFromEnv() (Config, error) {
 	cfg := Config{
 		ControlURL:                 os.Getenv("GHOSTWIRE_CONTROL_URL"),
 		AgentID:                    os.Getenv("GHOSTWIRE_AGENT_ID"),
-		EnrollmentToken:            os.Getenv("GHOSTWIRE_ENROLLMENT_TOKEN"),
+		APIToken:                   os.Getenv("GHOSTWIRE_API_TOKEN"),
 		StateDir:                   envOrDefault("GHOSTWIRE_STATE_DIR", "/var/lib/ghostwire"),
 		Hostname:                   hostname,
 		Endpoint:                   os.Getenv("GHOSTWIRE_ENDPOINT"),
@@ -46,8 +46,8 @@ func ConfigFromEnv() (Config, error) {
 	if cfg.ControlURL == "" {
 		return Config{}, fmt.Errorf("GHOSTWIRE_CONTROL_URL is required")
 	}
-	if cfg.EnrollmentToken == "" {
-		return Config{}, fmt.Errorf("GHOSTWIRE_ENROLLMENT_TOKEN is required")
+	if cfg.APIToken == "" {
+		return Config{}, fmt.Errorf("GHOSTWIRE_API_TOKEN is required")
 	}
 	return cfg, nil
 }

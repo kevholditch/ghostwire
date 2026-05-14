@@ -108,7 +108,6 @@ func (w *registryWhen) agent_a_enrolls() {
 		Hostname:           "alpha",
 		WireGuardPublicKey: "pub-a",
 		Endpoint:           "172.28.0.11:51820",
-		EnrollmentToken:    "secret",
 	}, w.state.baseTime)
 }
 
@@ -119,16 +118,7 @@ func (w *registryWhen) agent_a_reenrolls() {
 		Hostname:           "alpha-renamed",
 		WireGuardPublicKey: "pub-a",
 		Endpoint:           "172.28.0.11:51820",
-		EnrollmentToken:    "secret",
 	}, w.state.baseTime.Add(time.Second))
-}
-
-func (w *registryWhen) agent_a_enrolls_with_an_invalid_token() {
-	w.state.t.Helper()
-	_, w.state.enrollErr = w.state.registry.Enroll(protocol.EnrollRequest{
-		AgentID:         "agent-a",
-		EnrollmentToken: "wrong",
-	}, w.state.baseTime)
 }
 
 func (w *registryWhen) agent_a_sends_a_heartbeat_with_updated_metadata() {
@@ -139,7 +129,6 @@ func (w *registryWhen) agent_a_sends_a_heartbeat_with_updated_metadata() {
 		Hostname:           "alpha-new",
 		WireGuardPublicKey: "pub-a-new",
 		Endpoint:           "172.28.0.111:51820",
-		EnrollmentToken:    "secret",
 	}, heartbeatTime)
 	w.state.agent, w.state.agentFound = w.state.registry.Agent("agent-a")
 }
@@ -147,8 +136,7 @@ func (w *registryWhen) agent_a_sends_a_heartbeat_with_updated_metadata() {
 func (w *registryWhen) a_missing_agent_sends_a_heartbeat() {
 	w.state.t.Helper()
 	w.state.heartbeatErr = w.state.registry.Heartbeat(protocol.HeartbeatRequest{
-		AgentID:         "missing",
-		EnrollmentToken: "secret",
+		AgentID: "missing",
 	}, w.state.baseTime)
 }
 
@@ -169,7 +157,6 @@ func (w *registryWhen) agent_a_reenrolls_with_new_metadata() {
 		Hostname:           "agent-a-renamed",
 		WireGuardPublicKey: "pub-a-new",
 		Endpoint:           "172.28.0.111:51820",
-		EnrollmentToken:    "secret",
 	}, w.state.baseTime.Add(3*time.Second))
 	w.state.nodes = w.state.registry.Nodes(w.state.baseTime.Add(3 * time.Second))
 }
@@ -178,12 +165,6 @@ func (th *registryThen) agent_a_is_given_the_first_ghostwire_ip() *registryThen 
 	th.state.t.Helper()
 	th.state.assertions.NoError(th.state.enrollErr)
 	th.state.assertions.Equal("10.44.0.1", th.state.agentAEnroll.PrivateIP)
-	return th
-}
-
-func (th *registryThen) the_agent_is_rejected_as_unauthorized() *registryThen {
-	th.state.t.Helper()
-	th.state.assertions.ErrorIs(th.state.enrollErr, ErrUnauthorized)
 	return th
 }
 
@@ -228,7 +209,9 @@ func (th *registryThen) agent_a_is_listed_with_its_node_metadata() *registryThen
 		Hostname:           "agent-a",
 		WireGuardPublicKey: "pub-a",
 		GhostwireIP:        "10.44.0.1",
+		Endpoint:           "172.28.0.11:51820",
 		LastSeen:           th.state.baseTime,
+		Status:             protocol.NodeStatusOnline,
 	}, node)
 	return th
 }
@@ -257,6 +240,20 @@ func (th *registryThen) agent_a_is_listed_before_agent_z() *registryThen {
 	return th
 }
 
+func (th *registryThen) agent_a_is_listed_as_online() *registryThen {
+	th.state.t.Helper()
+	node := th.findNode("agent-a")
+	th.state.assertions.Equal(protocol.NodeStatusOnline, node.Status)
+	return th
+}
+
+func (th *registryThen) agent_c_is_listed_as_stale() *registryThen {
+	th.state.t.Helper()
+	node := th.findNode("agent-c")
+	th.state.assertions.Equal(protocol.NodeStatusStale, node.Status)
+	return th
+}
+
 func (th *registryThen) and() *registryThen {
 	th.state.t.Helper()
 	return th
@@ -279,7 +276,6 @@ func newTestRegistry(t *testing.T) *Registry {
 	ipam, err := NewIPAM("10.44.0.0/29")
 	assertions.NoError(err)
 	return NewRegistry(RegistryConfig{
-		EnrollmentToken:   "secret",
 		NetworkCIDR:       "10.44.0.0/29",
 		HeartbeatInterval: time.Second,
 		PollInterval:      time.Second,
@@ -294,7 +290,6 @@ func enrollAgent(t *testing.T, registry *Registry, id, hostname, publicKey, endp
 		Hostname:           hostname,
 		WireGuardPublicKey: publicKey,
 		Endpoint:           endpoint,
-		EnrollmentToken:    "secret",
 	}, now)
 	require.NoError(t, err)
 	return resp

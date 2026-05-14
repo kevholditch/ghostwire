@@ -79,6 +79,7 @@ func (g *ghostwireGiven) the_linux_binaries_are_built() *ghostwireGiven {
 	g.state.assertions.NoError(os.MkdirAll(binDir, 0o755))
 	g.build("ghostwire-control", "./cmd/ghostwire-control")
 	g.build("ghostwire-agent", "./cmd/ghostwire-agent")
+	g.build("ghostwire", "./cmd/ghostwire")
 	return g
 }
 
@@ -114,6 +115,23 @@ func (g *ghostwireGiven) the_agents_can_communicate_over_wireguard() *ghostwireG
 	g.state.assertions.NotEmpty(g.state.agentAPrivateIP)
 	g.state.t.Logf("pinging agent-a private IP %s from agent-b", g.state.agentAPrivateIP)
 	run(g.state.t, g.state.ctx, g.state.repo, append(g.state.composeArgs, "exec", "-T", "agent-b", "ping", "-c", "3", "-W", "2", g.state.agentAPrivateIP)...)
+	return g
+}
+
+func (g *ghostwireGiven) the_operator_cli_can_inspect_the_joined_agents() *ghostwireGiven {
+	g.state.t.Helper()
+	g.state.t.Log("checking operator CLI node views")
+	cli := append(g.state.composeArgs, "exec", "-T", "control", "/usr/local/bin/ghostwire", "--control-url", "http://control:8080", "--api-token", "test-token")
+	out := runOutput(g.state.t, g.state.ctx, g.state.repo, append(cli, "nodes", "list")...)
+	g.state.assertions.Contains(out, "agent-a")
+	g.state.assertions.Contains(out, "agent-b")
+
+	out = runOutput(g.state.t, g.state.ctx, g.state.repo, append(cli, "nodes", "get", g.state.agentABefore.NodeID)...)
+	g.state.assertions.Contains(out, g.state.agentABefore.NodeID)
+	g.state.assertions.Contains(out, g.state.agentABefore.GhostwireIP)
+
+	out = runOutput(g.state.t, g.state.ctx, g.state.repo, append(cli, "nodes", "peers", g.state.agentABefore.NodeID)...)
+	g.state.assertions.Contains(out, g.state.agentB.NodeID)
 	return g
 }
 
@@ -271,6 +289,7 @@ func getNodes(t *testing.T, ctx context.Context) (protocol.NodesResponse, bool) 
 	t.Helper()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:18080/v1/nodes", nil)
 	require.NoError(t, err)
+	req.Header.Set("authorization", "Bearer test-token")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return protocol.NodesResponse{}, false
@@ -292,6 +311,7 @@ func waitForPeerPrivateIP(t *testing.T, ctx context.Context, agentID, wantPeer s
 	waitFor(t, ctx, agentID+" sees "+wantPeer, func() bool {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:18080/v1/agents/"+agentID+"/peers", nil)
 		require.NoError(t, err)
+		req.Header.Set("authorization", "Bearer test-token")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return false
@@ -370,6 +390,15 @@ func run(t *testing.T, ctx context.Context, dir string, args ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	require.NoError(t, cmd.Run(), "run %s", strings.Join(args, " "))
+}
+
+func runOutput(t *testing.T, ctx context.Context, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "run %s\n%s", strings.Join(args, " "), out)
+	return string(out)
 }
 
 func runBestEffort(t *testing.T, ctx context.Context, args ...string) {

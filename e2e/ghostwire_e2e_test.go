@@ -10,6 +10,7 @@ func TestStableNodeIdentityAndWireGuardConnectivity(t *testing.T) {
 	given.the_linux_binaries_are_built().and().
 		the_docker_compose_environment_is_running().and().
 		the_agents_have_joined_the_control_plane().and().
+		the_operator_cli_can_inspect_the_joined_agents().and().
 		the_agents_can_communicate_over_wireguard()
 	when.agent_a_is_restarted()
 	then.agent_a_keeps_the_same_stable_node_identity().and().

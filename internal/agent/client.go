@@ -13,14 +13,16 @@ import (
 )
 
 type Client struct {
-	baseURL string
-	http    *http.Client
+	baseURL  string
+	apiToken string
+	http     *http.Client
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL, apiToken string) *Client {
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: 10 * time.Second},
+		baseURL:  strings.TrimRight(baseURL, "/"),
+		apiToken: apiToken,
+		http:     &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -41,6 +43,7 @@ func (c *Client) Peers(ctx context.Context, agentID string) (protocol.PeersRespo
 	if err != nil {
 		return protocol.PeersResponse{}, err
 	}
+	c.authorize(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return protocol.PeersResponse{}, err
@@ -66,6 +69,7 @@ func (c *Client) post(ctx context.Context, path string, body any, wantStatus int
 		return err
 	}
 	req.Header.Set("content-type", "application/json")
+	c.authorize(req)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
@@ -78,4 +82,8 @@ func (c *Client) post(ctx context.Context, path string, body any, wantStatus int
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 	return nil
+}
+
+func (c *Client) authorize(req *http.Request) {
+	req.Header.Set("authorization", "Bearer "+c.apiToken)
 }

@@ -16,7 +16,6 @@ var (
 )
 
 type RegistryConfig struct {
-	EnrollmentToken   string
 	NetworkCIDR       string
 	HeartbeatInterval time.Duration
 	PollInterval      time.Duration
@@ -48,9 +47,6 @@ func NewRegistry(cfg RegistryConfig, ipam *IPAM) *Registry {
 }
 
 func (r *Registry) Enroll(req protocol.EnrollRequest, now time.Time) (protocol.EnrollResponse, error) {
-	if req.EnrollmentToken != r.cfg.EnrollmentToken {
-		return protocol.EnrollResponse{}, ErrUnauthorized
-	}
 	if req.AgentID == "" || req.WireGuardPublicKey == "" {
 		return protocol.EnrollResponse{}, ErrInvalidAgent
 	}
@@ -81,10 +77,6 @@ func (r *Registry) Enroll(req protocol.EnrollRequest, now time.Time) (protocol.E
 }
 
 func (r *Registry) Heartbeat(req protocol.HeartbeatRequest, now time.Time) error {
-	if req.EnrollmentToken != r.cfg.EnrollmentToken {
-		return ErrUnauthorized
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -132,22 +124,46 @@ func (r *Registry) Peers(agentID string, now time.Time) (protocol.PeersResponse,
 	return protocol.PeersResponse{Peers: peers}, nil
 }
 
-func (r *Registry) Nodes(_ time.Time) protocol.NodesResponse {
+func (r *Registry) Nodes(now time.Time) protocol.NodesResponse {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	nodes := make([]protocol.Node, 0, len(r.agents))
 	for _, agent := range r.agents {
-		nodes = append(nodes, protocol.Node{
-			NodeID:             agent.AgentID,
-			Hostname:           agent.Hostname,
-			WireGuardPublicKey: agent.WireGuardPublicKey,
-			GhostwireIP:        agent.PrivateIP,
-			LastSeen:           agent.LastSeen,
-		})
+		nodes = append(nodes, r.nodeFromAgent(agent, now))
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].NodeID < nodes[j].NodeID })
 	return protocol.NodesResponse{Nodes: nodes}
+}
+
+func (r *Registry) Node(nodeID string, now time.Time) (protocol.Node, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	agent, ok := r.agents[nodeID]
+	if !ok {
+		return protocol.Node{}, ErrAgentNotFound
+	}
+	return r.nodeFromAgent(agent, now), nil
+}
+
+func (r *Registry) NodePeers(nodeID string, now time.Time) (protocol.NodesResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.agents[nodeID]; !ok {
+		return protocol.NodesResponse{}, ErrAgentNotFound
+	}
+
+	nodes := make([]protocol.Node, 0, len(r.agents))
+	for id, agent := range r.agents {
+		if id == nodeID || r.isExpired(agent, now) {
+			continue
+		}
+		nodes = append(nodes, r.nodeFromAgent(agent, now))
+	}
+	sort.Slice(nodes, func(i, j int) bool { return nodes[i].NodeID < nodes[j].NodeID })
+	return protocol.NodesResponse{Nodes: nodes}, nil
 }
 
 func (r *Registry) Agent(agentID string) (AgentRecord, bool) {
@@ -163,4 +179,20 @@ func (r *Registry) isExpired(agent AgentRecord, now time.Time) bool {
 		return false
 	}
 	return now.Sub(agent.LastSeen) > r.cfg.AgentTTL
+}
+
+func (r *Registry) nodeFromAgent(agent AgentRecord, now time.Time) protocol.Node {
+	status := protocol.NodeStatusOnline
+	if r.isExpired(agent, now) {
+		status = protocol.NodeStatusStale
+	}
+	return protocol.Node{
+		NodeID:             agent.AgentID,
+		Hostname:           agent.Hostname,
+		WireGuardPublicKey: agent.WireGuardPublicKey,
+		GhostwireIP:        agent.PrivateIP,
+		Endpoint:           agent.Endpoint,
+		LastSeen:           agent.LastSeen,
+		Status:             status,
+	}
 }

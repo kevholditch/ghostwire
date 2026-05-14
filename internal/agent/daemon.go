@@ -68,7 +68,6 @@ func (d *Daemon) enrollUntilSuccess(ctx context.Context) (protocol.EnrollRespons
 			Hostname:           d.cfg.Hostname,
 			WireGuardPublicKey: d.identity.PublicKey,
 			Endpoint:           d.cfg.Endpoint,
-			EnrollmentToken:    d.cfg.EnrollmentToken,
 		})
 		if err == nil {
 			log.Printf("enrolled agent_id=%s private_ip=%s", resp.AgentID, resp.PrivateIP)
@@ -92,7 +91,6 @@ func (d *Daemon) heartbeat(ctx context.Context) error {
 		Hostname:           d.cfg.Hostname,
 		WireGuardPublicKey: d.identity.PublicKey,
 		Endpoint:           d.cfg.Endpoint,
-		EnrollmentToken:    d.cfg.EnrollmentToken,
 	})
 }
 

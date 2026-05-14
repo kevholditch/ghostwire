@@ -18,7 +18,7 @@ func main() {
 		log.Fatal(err)
 	}
 	registry := controlplane.NewRegistry(cfg.RegistryConfig(), ipam)
-	server := controlplane.NewServer(registry, time.Now)
+	server := controlplane.NewServer(registry, time.Now, cfg.APIToken)
 
 	log.Printf("ghostwire-control listening on %s", cfg.ListenAddr)
 	if err := http.ListenAndServe(cfg.ListenAddr, server); err != nil {

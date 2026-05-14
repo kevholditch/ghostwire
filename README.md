@@ -14,13 +14,14 @@ Version 1 is single-tenant:
 ```bash
 go build ./cmd/ghostwire-control
 go build ./cmd/ghostwire-agent
+go build ./cmd/ghostwire
 ```
 
 ## Control Plane
 
 Required environment:
 
-- `GHOSTWIRE_ENROLLMENT_TOKEN`: shared token agents must present.
+- `GHOSTWIRE_API_TOKEN`: bearer token required for all `/v1/*` endpoints.
 
 Optional environment:
 
@@ -33,7 +34,7 @@ Optional environment:
 Run:
 
 ```bash
-GHOSTWIRE_ENROLLMENT_TOKEN=secret ./ghostwire-control
+GHOSTWIRE_API_TOKEN=secret ./ghostwire-control
 ```
 
 ## Agent
@@ -41,7 +42,7 @@ GHOSTWIRE_ENROLLMENT_TOKEN=secret ./ghostwire-control
 Required environment:
 
 - `GHOSTWIRE_CONTROL_URL`: control-plane base URL.
-- `GHOSTWIRE_ENROLLMENT_TOKEN`: shared enrollment token.
+- `GHOSTWIRE_API_TOKEN`: shared API bearer token.
 
 Optional environment:
 
@@ -61,10 +62,28 @@ Run:
 
 ```bash
 sudo GHOSTWIRE_CONTROL_URL=http://control.example:8080 \
-  GHOSTWIRE_ENROLLMENT_TOKEN=secret \
+  GHOSTWIRE_API_TOKEN=secret \
   GHOSTWIRE_ENDPOINT=203.0.113.10:51820 \
   ./ghostwire-agent
 ```
+
+## Operator CLI
+
+The `ghostwire` CLI inspects the control plane over the v1 API:
+
+```bash
+GHOSTWIRE_CONTROL_URL=http://control.example:8080 \
+  GHOSTWIRE_API_TOKEN=secret \
+  ./ghostwire nodes list
+
+./ghostwire --control-url http://control.example:8080 \
+  --api-token secret \
+  nodes get agent-a
+
+./ghostwire --output json nodes peers agent-a
+```
+
+The operator API contract is documented in `docs/openapi/v1.json`. `/healthz` is unauthenticated; all `/v1/*` routes require `Authorization: Bearer <token>`.
 
 ## Tests
 

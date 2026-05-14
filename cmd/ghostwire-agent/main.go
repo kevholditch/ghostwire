@@ -23,7 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	client := agent.NewClient(cfg.ControlURL)
+	client := agent.NewClient(cfg.ControlURL, cfg.APIToken)
 	device := wireguard.NewLinuxDevice(cfg.InterfaceName)
 	daemon := agent.NewDaemon(cfg, identity, client, device)
 

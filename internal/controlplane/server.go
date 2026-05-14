@@ -12,15 +12,16 @@ import (
 
 type Server struct {
 	registry *Registry
+	apiToken string
 	now      func() time.Time
 	mux      *http.ServeMux
 }
 
-func NewServer(registry *Registry, now func() time.Time) *Server {
+func NewServer(registry *Registry, now func() time.Time, apiToken string) *Server {
 	if now == nil {
 		now = time.Now
 	}
-	server := &Server{registry: registry, now: now, mux: http.NewServeMux()}
+	server := &Server{registry: registry, apiToken: apiToken, now: now, mux: http.NewServeMux()}
 	server.routes()
 	return server
 }
@@ -32,14 +33,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", s.handleHealthz)
 	s.mux.HandleFunc("/v1/nodes", s.handleNodes)
+	s.mux.HandleFunc("/v1/nodes/", s.handleNode)
 	s.mux.HandleFunc("/v1/agents/enroll", s.handleEnroll)
 	s.mux.HandleFunc("/v1/agents/heartbeat", s.handleHeartbeat)
 	s.mux.HandleFunc("/v1/agents/", s.handleAgent)
+	s.mux.HandleFunc("/v1/", s.handleV1NotFound)
+	s.mux.HandleFunc("/v1", s.handleV1NotFound)
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -47,13 +51,16 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	var req protocol.EnrollRequest
 	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "malformed json")
+		writeError(w, http.StatusBadRequest, "bad_request", "malformed json")
 		return
 	}
 	resp, err := s.registry.Enroll(req, s.now())
@@ -65,13 +72,16 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	var req protocol.HeartbeatRequest
 	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "malformed json")
+		writeError(w, http.StatusBadRequest, "bad_request", "malformed json")
 		return
 	}
 	if err := s.registry.Heartbeat(req, s.now()); err != nil {
@@ -82,22 +92,59 @@ func (s *Server) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	writeJSON(w, http.StatusOK, s.registry.Nodes(s.now()))
 }
 
-func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleNode(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
 	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/v1/nodes/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 1 && parts[0] != "" {
+		node, err := s.registry.Node(parts[0], s.now())
+		if err != nil {
+			s.writeRegistryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, node)
+		return
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "peers" {
+		peers, err := s.registry.NodePeers(parts[0], s.now())
+		if err != nil {
+			s.writeRegistryError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, peers)
+		return
+	}
+	writeError(w, http.StatusNotFound, "not_found", "not found")
+}
+
+func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/v1/agents/")
 	parts := strings.Split(path, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] != "peers" {
-		writeError(w, http.StatusNotFound, "not found")
+		writeError(w, http.StatusNotFound, "not_found", "not found")
 		return
 	}
 	peers, err := s.registry.Peers(parts[0], s.now())
@@ -108,19 +155,34 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, peers)
 }
 
+func (s *Server) handleV1NotFound(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
+	writeError(w, http.StatusNotFound, "not_found", "not found")
+}
+
 func (s *Server) writeRegistryError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrUnauthorized):
-		writeError(w, http.StatusUnauthorized, "unauthorized")
+		writeError(w, http.StatusUnauthorized, "unauthorized", "missing or invalid API token")
 	case errors.Is(err, ErrAgentNotFound):
-		writeError(w, http.StatusNotFound, "agent not found")
+		writeError(w, http.StatusNotFound, "not_found", "agent not found")
 	case errors.Is(err, ErrInvalidAgent):
-		writeError(w, http.StatusBadRequest, "invalid agent")
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid agent")
 	case errors.Is(err, ErrCIDRExhausted):
-		writeError(w, http.StatusServiceUnavailable, "cidr exhausted")
+		writeError(w, http.StatusServiceUnavailable, "cidr_exhausted", "cidr exhausted")
 	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
+}
+
+func (s *Server) authorize(w http.ResponseWriter, r *http.Request) bool {
+	if r.Header.Get("authorization") == "Bearer "+s.apiToken {
+		return true
+	}
+	s.writeRegistryError(w, ErrUnauthorized)
+	return false
 }
 
 func decodeJSON(r *http.Request, dst any) error {
@@ -135,6 +197,6 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, protocol.ErrorResponse{Error: msg})
+func writeError(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, protocol.ErrorResponse{Code: code, Message: msg})
 }

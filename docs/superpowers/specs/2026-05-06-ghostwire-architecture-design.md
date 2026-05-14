@@ -79,8 +79,8 @@ The control plane owns membership state and private IP assignment. It does not h
 
 Responsibilities:
 
-- Load configuration: listen address, enrollment token, private CIDR, lease TTL, and heartbeat TTL.
-- Validate the shared enrollment token on agent enrollment and heartbeat requests.
+- Load configuration: listen address, API token, private CIDR, lease TTL, and heartbeat TTL.
+- Validate the shared API bearer token on all `/v1/*` requests.
 - Allocate stable private WireGuard IPs from the configured CIDR.
 - Store each live agent's stable ID, hostname, WireGuard public key, private IP, observed endpoint, and heartbeat timestamp.
 - Return peer snapshots to agents, excluding the requesting agent.
@@ -108,7 +108,6 @@ Enrollment request fields:
 - `hostname`
 - `wireguard_public_key`
 - `endpoint`
-- `enrollment_token`
 
 Enrollment response fields:
 
@@ -124,13 +123,12 @@ Heartbeat request fields:
 - `hostname`
 - `wireguard_public_key`
 - `endpoint`
-- `enrollment_token`
 
 Peer snapshot response fields:
 
 - `peers`: list of peer records containing `agent_id`, `hostname`, `wireguard_public_key`, `private_ip`, `endpoint`, and `last_seen`.
 
-The enrollment token is intentionally simple for v1. It is not a substitute for a full identity system, but it is enough to keep random unauthenticated agents from joining a single private network during the first implementation.
+The API token is intentionally simple for v1. It is not a substitute for a full identity system, but it is enough to keep random unauthenticated clients from joining or inspecting a single private network during the first implementation.
 
 ## Agent
 
@@ -138,7 +136,7 @@ The agent is a long-running daemon that turns control-plane membership into loca
 
 Responsibilities:
 
-- Load configuration: control-plane URL, enrollment token, WireGuard interface name, state directory, endpoint, and timing values.
+- Load configuration: control-plane URL, API token, WireGuard interface name, state directory, endpoint, and timing values.
 - Load or create a stable local agent identity.
 - Generate and persist a WireGuard private key locally.
 - Derive the WireGuard public key and send only the public key to the control plane.

@@ -18,14 +18,6 @@ func TestRegistryKeepsPrivateIPWhenAgentReenrolls(t *testing.T) {
 	then.agent_a_keeps_its_ghostwire_ip()
 }
 
-func TestRegistryRejectsInvalidEnrollmentToken(t *testing.T) {
-	given, when, then := NewRegistryStage(t)
-
-	given.there_is_an_empty_registry()
-	when.agent_a_enrolls_with_an_invalid_token()
-	then.the_agent_is_rejected_as_unauthorized()
-}
-
 func TestRegistryHeartbeatRefreshesAgent(t *testing.T) {
 	given, when, then := NewRegistryStage(t)
 
@@ -76,4 +68,14 @@ func TestControlPlaneListsNodesByNodeID(t *testing.T) {
 		there_is_an_agent_that_exists_with_hostname_alpha()
 	when.the_control_plane_lists_registered_nodes()
 	then.agent_a_is_listed_before_agent_z()
+}
+
+func TestControlPlaneListsStaleNodesWithStatus(t *testing.T) {
+	given, when, then := NewRegistryStage(t)
+
+	given.there_is_an_active_agent_a().and().
+		there_is_an_expired_agent_c()
+	when.the_control_plane_lists_registered_nodes()
+	then.agent_a_is_listed_as_online().and().
+		agent_c_is_listed_as_stale()
 }
